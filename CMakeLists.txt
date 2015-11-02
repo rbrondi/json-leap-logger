@@ -9,30 +9,36 @@ set(VERSION_MAJOR 1)
 set(VERSION_MINOR 0)
 
 set(CMAKE_BUILD_TYPE "Debug")
+#set(CMAKE_BUILD_TYPE "Releases")
+
+if( CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    message ( STATUS "compiling for Windows systems" )
+    set(CMAKE_PREFIX_PATH "C:/usr")
+    # Widgets finds its own dependencies.
+    set(QT5_CMAKE_HOME "C:/Qt/5.4/mingw491_32/lib/cmake")
+    include_directories("C:/usr/leap/lib/MinGW/V2")
+    link_directories("C:/usr/leap/lib/MinGW/V2")
+else()
+    #enable arms logging only on linux cause the mingw version of the lib does not still support it
+    add_definitions(-DUSE_LEAP_ARM)
+
+    message ( STATUS "compiling for unix systems" )
+    set(CMAKE_PREFIX_PATH "~/usr")
+    # Widgets finds its own dependencies.
+    set(QT5_CMAKE_HOME "~/Qt5.4.1/5.4/gcc_64/lib/cmake")
+    include_directories("~/.leap/include")
+    link_directories("~/.leap/lib/x64")
+endif()
 
 set(CMAKE_PREFIX_PATH "/home/hara/usr")
 message(WARNING "CMAKE_PREFIX_PATH = ${CMAKE_PREFIX_PATH}")
 #########################################################
-# FIND OPENGL
-#########################################################
-#find_package(OpenGL REQUIRED)
-#include_directories(${OpenGL_INCLUDE_DIRS})
-#link_directories(${OpenGL_LIBRARY_DIRS})
-#add_definitions(${OpenGL_DEFINITIONS})
-#if(NOT OPENGL_FOUND)
-#	message(ERROR " OPENGL not found!")
-#endif(NOT OPENGL_FOUND)
 
-
-#add_subdirectory(lib/jni)
-message(STATUS "Compiling QT-Desktop module")
 
 # add the binary tree to the search path for include files
 # so that we will find TutorialConfig.h
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
-#including JNI folder
-#include_directories("../lib/jni")
 
 #########################################################
 #########################################################
@@ -40,9 +46,6 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 #########################################################
 # LEAP
 #########################################################
-include_directories("~/.leap/include")
-link_directories("~/.leap/lib/x64")
-#add_library("Leap" SHARED IMPORTED)
 
 
 
@@ -72,7 +75,7 @@ add_executable(amicaLeap main.cpp
 			leaplogger.cpp
             ${UIS_HDRS} ${RESOURCES})
 
-target_link_libraries(amicaLeap Qt5::Core Qt5::Gui Qt5::Widgets Leap)
+target_link_libraries(amicaLeap Qt5::Core Qt5::Gui Qt5::Widgets -lLeap)
 
 set(CMAKE_CXX_FLAGS "-Wreorder")
 

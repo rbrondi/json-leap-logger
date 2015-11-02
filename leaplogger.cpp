@@ -3,6 +3,9 @@
 
 #include <QTextStream>
 #include <QJsonDocument>
+#include <QJsonArray>
+#include <QDateTime>
+#include <chrono>
 
 using namespace Leap;
 
@@ -82,26 +85,28 @@ void LeapLogger::onFrame(const Controller& controller) {
     // Get the most recent frame and report some basic information
     const Frame frame = controller.frame();
     std::cout << "Frame id: " << frame.id();
-
-
+    
     QJsonObject obj {
         {"frame_id", (int)frame.id()},
-        //        {"hands", frame.hands().count()},
-        //        {"extended fingers", frame.fingers().extended().count()},
-        //        {"tools", frame.tools().count()},
-        //        {"gestures", frame.gestures().count()}
     };
 
-    if(this->mConfig.isLoggingTimestamp())
-        obj["timestamp"] = QString::number(frame.timestamp());
+    if(this->mConfig.isLoggingTimestamp()){
+        //obj["timestamp"] = QString::number(QDateTime::currentDateTime().toTime_t());
+        std::chrono::time_point<std::chrono::steady_clock> tp = std::chrono::steady_clock::now();
+        double ms = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
+        obj["timestamp"] = ms;
+    }
 
     HandList hands = frame.hands();
+    QJsonArray handList;
     for (HandList::const_iterator hl = hands.begin(); hl != hands.end(); ++hl) {
         // Get the first hand
         QJsonObject jHand;
         const Hand hand = *hl;
+        jHand["id"] = hand.id();
         jHand["type"] = hand.isLeft() ? "l" : "r";
         jHand["palm"] = this->serializeVector(hand.palmPosition());
+        jHand["palmWidth"] = hand.palmWidth();
 
         // Get the hand's normal vector and direction
         const Vector normal = hand.palmNormal();
@@ -112,6 +117,7 @@ void LeapLogger::onFrame(const Controller& controller) {
         jHand["roll"] = normal.roll() * RAD_TO_DEG;
         jHand["yaw"] = direction.yaw() * RAD_TO_DEG;
 
+#ifdef USE_LEAP_ARM
         if(this->mConfig.isLoggingArm()) {
             // Get the Arm bone
             Arm arm = hand.arm();
@@ -122,12 +128,15 @@ void LeapLogger::onFrame(const Controller& controller) {
 
             jHand["arm"] = jArm;
         }
-
+#endif
         // Get fingers
         const FingerList fingers = hand.fingers();
+        QJsonArray fingerList;
         for (FingerList::const_iterator fl = fingers.begin(); fl != fingers.end(); ++fl) {
             QJsonObject jFinger;
             const Finger finger = *fl;
+            jFinger["id"] = finger.id();
+
             if(this->mConfig.isLoggingName())
                 jFinger["name"] = fingerNames[finger.type()].c_str();
 
@@ -137,10 +146,13 @@ void LeapLogger::onFrame(const Controller& controller) {
             }
 
             // Get finger bones
+            QJsonArray boneList;
             for (int b = 0; b < 4; ++b) {
                 QJsonObject jBone;
                 Bone::Type boneType = static_cast<Bone::Type>(b);
                 Bone bone = finger.bone(boneType);
+                jBone["id"] = b;
+
                 if(this->mConfig.isLoggingName())
                     jBone["name"] = boneNames[boneType].c_str();
 
@@ -153,12 +165,17 @@ void LeapLogger::onFrame(const Controller& controller) {
                 if(this->mConfig.isLoggingDirection())
                     jBone["direction"] = this->serializeVector(bone.direction());
 
-                jFinger["bone_" + QString::number(b)] = jBone;
+                boneList.append(jBone);
             }
-            jHand["finger_" + QString::number(finger.id())] = jFinger;
+            jFinger["bones"] = boneList;
+            //jHand["finger_" + QString::number(finger.id())] = jFinger;
+            fingerList.append(jFinger);
         }
-        obj["hand_" + QString::number(hand.id())] = jHand;
+        jHand["fingers"] = fingerList;
+        //obj["hand_" + QString::number(hand.id())] = jHand;
+        handList.append(jHand);
     }
+    obj["hands"] = handList;
 
     QJsonDocument doc(obj);
     if(mCounter != 0)

@@ -108,27 +108,35 @@ void LeapLogger::onFrame(const Controller& controller) {
         jHand["palm"] = this->serializeVector(hand.palmPosition());
         jHand["palmWidth"] = hand.palmWidth();
 
-        // Get the hand's normal vector and direction
+        // Get the hand's normal vector, direction and basis
         const Vector normal = hand.palmNormal();
         const Vector direction = hand.direction();
+		jHand["normal"] = this->serializeVector(hand.palmNormal());
+		jHand["direction"] = this->serializeVector(hand.direction());
+		jHand["xBasis"] = this->serializeVector(hand.basis().xBasis);
+		jHand["yBasis"] = this->serializeVector(hand.basis().yBasis);
+		jHand["zBasis"] = this->serializeVector(hand.basis().zBasis);
 
         // Calculate the hand's pitch, roll, and yaw angles
         jHand["pitch"] = direction.pitch() * RAD_TO_DEG;
         jHand["roll"] = normal.roll() * RAD_TO_DEG;
         jHand["yaw"] = direction.yaw() * RAD_TO_DEG;
 
-#ifdef USE_LEAP_ARM
-        if(this->mConfig.isLoggingArm()) {
-            // Get the Arm bone
-            Arm arm = hand.arm();
-            QJsonObject jArm;
-            jArm["direction"] = this->serializeVector(arm.direction());
-            jArm["wrist"] = this->serializeVector(arm.wristPosition());
-            jArm["elbow"] = this->serializeVector(arm.elbowPosition());
+		// Get how confident we are with a given hand pose
+		jHand["confidence"] = hand.confidence();
 
-            jHand["arm"] = jArm;
-        }
-#endif
+//#ifdef USE_LEAP_ARM
+//        if(this->mConfig.isLoggingArm()) {
+//            // Get the Arm bone
+//            Arm arm = hand.arm();
+//            QJsonObject jArm;
+//            jArm["direction"] = this->serializeVector(arm.direction());
+//            jArm["wrist"] = this->serializeVector(arm.wristPosition());
+//            jArm["elbow"] = this->serializeVector(arm.elbowPosition());
+
+//            jHand["arm"] = jArm;
+//        }
+//#endif
         // Get fingers
         const FingerList fingers = hand.fingers();
         QJsonArray fingerList;
@@ -143,6 +151,7 @@ void LeapLogger::onFrame(const Controller& controller) {
             if(this->mConfig.isLoggingFingerDimensions()) {
                 jFinger["length"] = finger.length();
                 jFinger["width"] = finger.width();
+            	jFinger["isExtended"] = finger.isExtended() ? 1 : 0;
             }
 
             // Get finger bones
@@ -164,6 +173,10 @@ void LeapLogger::onFrame(const Controller& controller) {
 
                 if(this->mConfig.isLoggingDirection())
                     jBone["direction"] = this->serializeVector(bone.direction());
+		
+		jBone["xBasis"] = this->serializeVector(bone.basis().xBasis);
+		jBone["yBasis"] = this->serializeVector(bone.basis().yBasis);
+		jBone["zBasis"] = this->serializeVector(bone.basis().zBasis);
 
                 boneList.append(jBone);
             }
@@ -179,7 +192,7 @@ void LeapLogger::onFrame(const Controller& controller) {
 
     QJsonDocument doc(obj);
     if(mCounter != 0)
-        (*this->mOut)<< ", ";
+        (*this->mOut)<< ",\n ";
 
     (*this->mOut)<< doc.toJson(QJsonDocument::Compact);
     ++this->mCounter;
